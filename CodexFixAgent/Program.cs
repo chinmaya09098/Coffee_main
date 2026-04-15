@@ -250,13 +250,16 @@ namespace CodexFixAgent
 
     // ─────────────────────────────────────────────
     //  API KEY STORE
-    //  Reads from  keys.config  (next to the .exe)
+    //  Search order for keys.config:
+    //    1. Path in CODEX_KEYS_CONFIG env variable  ← custom location
+    //    2. Next to the .exe          (bin\Debug\)
+    //    3. CodexFixAgent project folder (two levels up)
+    //    4. Solution root             (three levels up)
     //  keys.config is git-ignored — never committed
     // ─────────────────────────────────────────────
     static class ApiKeyStore
     {
-        public static readonly string ConfigPath =
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "keys.config");
+        public static string ConfigPath { get; private set; }
 
         public static string Endpoint   { get; private set; }
         public static string Key        { get; private set; }
@@ -264,21 +267,12 @@ namespace CodexFixAgent
 
         public static bool Load()
         {
-            if (File.Exists(ConfigPath))
+            ConfigPath = FindConfigFile();
+
+            if (ConfigPath != null)
             {
-                foreach (var raw in File.ReadAllLines(ConfigPath))
-                {
-                    string line = raw.Trim();
-                    if (line.StartsWith("#") || !line.Contains("=")) continue;
-
-                    int eq  = line.IndexOf('=');
-                    string k = line.Substring(0, eq).Trim();
-                    string v = line.Substring(eq + 1).Trim();
-
-                    if (k == "AZURE_OPENAI_ENDPOINT") Endpoint   = v;
-                    if (k == "AZURE_OPENAI_KEY")      Key        = v;
-                    if (k == "AZURE_DEPLOYMENT")      Deployment = v;
-                }
+                Console.WriteLine("[Agent] Keys loaded from: " + ConfigPath);
+                ParseFile(ConfigPath);
             }
 
             // Fall back to environment variables
@@ -290,6 +284,58 @@ namespace CodexFixAgent
                 Deployment = Environment.GetEnvironmentVariable("AZURE_DEPLOYMENT") ?? "gpt-4o";
 
             return !string.IsNullOrEmpty(Endpoint) && !string.IsNullOrEmpty(Key);
+        }
+
+        private static string FindConfigFile()
+        {
+            // 1. Custom path via environment variable
+            string custom = Environment.GetEnvironmentVariable("CODEX_KEYS_CONFIG");
+            if (!string.IsNullOrEmpty(custom) && File.Exists(custom))
+                return custom;
+
+            // 2. Next to the .exe  (bin\Debug\keys.config)
+            string exeDir = AppDomain.CurrentDomain.BaseDirectory;
+            string[] candidates = new[]
+            {
+                Path.Combine(exeDir, "keys.config"),                          // bin\Debug\
+                Path.Combine(exeDir, @"..\..\keys.config"),                   // CodexFixAgent\
+                Path.Combine(exeDir, @"..\..\..\keys.config")                 // solution root
+            };
+
+            foreach (string path in candidates)
+            {
+                string full = Path.GetFullPath(path);
+                if (File.Exists(full)) return full;
+            }
+
+            // Not found — create a template at the project folder level
+            string projectFolder = Path.GetFullPath(Path.Combine(exeDir, @"..\..\"));
+            string template      = Path.Combine(projectFolder, "keys.config");
+            File.WriteAllText(template,
+                "# Codex Fix Agent - Azure OpenAI Credentials\n" +
+                "# This file is git-ignored. Do NOT commit it.\n\n" +
+                "AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/openai/responses?api-version=2025-04-01-preview\n" +
+                "AZURE_OPENAI_KEY=your-key-here\n" +
+                "AZURE_DEPLOYMENT=gpt-4o\n");
+            Console.WriteLine("[Agent] Created template keys.config at:\n  " + template);
+            return null;
+        }
+
+        private static void ParseFile(string path)
+        {
+            foreach (var raw in File.ReadAllLines(path))
+            {
+                string line = raw.Trim();
+                if (line.StartsWith("#") || !line.Contains("=")) continue;
+
+                int    eq = line.IndexOf('=');
+                string k  = line.Substring(0, eq).Trim();
+                string v  = line.Substring(eq + 1).Trim();
+
+                if (k == "AZURE_OPENAI_ENDPOINT") Endpoint   = v;
+                if (k == "AZURE_OPENAI_KEY")      Key        = v;
+                if (k == "AZURE_DEPLOYMENT")      Deployment = v;
+            }
         }
     }
 
