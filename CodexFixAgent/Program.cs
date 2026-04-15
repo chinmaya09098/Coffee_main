@@ -281,8 +281,9 @@ namespace CodexFixAgent
             Run("checkout main");
             Run("pull origin main");
 
-            // Build branch name from error
-            string name = "fix/" + SanitizeBranch(errorMessage);
+            // Build branch name — append timestamp to guarantee uniqueness
+            string timestamp = DateTime.Now.ToString("yyyyMMdd-HHmm");
+            string name      = "fix/" + SanitizeBranch(errorMessage) + "-" + timestamp;
             Run("checkout -b " + name);
             return name;
         }
