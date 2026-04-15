@@ -1,3 +1,5 @@
 <Solution>
   <Project Path="Coffee/Coffee.csproj" />
+  <Project Path="CodexFixAgent/CodexFixAgent.csproj" />
+  <Project Path="Coffee.Tests/Coffee.Tests.csproj" />
 </Solution>
