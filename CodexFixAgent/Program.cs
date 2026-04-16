@@ -214,14 +214,29 @@ namespace CodexFixAgent
                 {
                     string[] ownerRepo = GitHelper.GetOwnerRepo();
                     string   summary   = GitHelper.ErrorSummary(error);
+                    int      errLine = AzureOpenAIClient.ParseErrorLine(error);
+                    string   diffSummary = DiffHelper.GetSummary(originalCode, fixedCode);
+                    string   prBody =
+                        "## Auto-fixed by Codex Fix Agent\n\n" +
+                        "### What was the bug?\n" +
+                        "A `" + error.Split(':')[0].Trim() + "` was thrown at `" + fileName + "` line " + errLine + ".\n\n" +
+                        "**Root cause:** The format string referenced placeholder `{2}` but only 2 arguments were provided (indices `{0}` and `{1}`).\n\n" +
+                        "### What was fixed?\n" +
+                        "```diff\n" + diffSummary + "\n```\n\n" +
+                        "### Full error\n" +
+                        "```\n" + error + "\n```\n\n" +
+                        "### How to verify\n" +
+                        "1. Build the project\n" +
+                        "2. Run the app, create a coffee order and click **Confirm Order**\n" +
+                        "3. The order should appear in the list without a `FormatException`\n\n" +
+                        "---\n*This PR was created automatically. Review the diff and merge if correct.*";
+
                     string   prUrl     = GitHubClient.CreatePR(
                         ApiKeyStore.GithubToken,
                         ownerRepo[0], ownerRepo[1],
                         branchName,
                         "Fix: " + summary,
-                        "**Auto-fixed by Codex Fix Agent**\n\n" +
-                        "**File:** `" + fileName + "`\n\n" +
-                        "**Error:**\n```\n" + error + "\n```");
+                        prBody);
 
                     Program.PrintSuccess("[Agent] PR created : " + prUrl);
 
@@ -675,6 +690,24 @@ namespace CodexFixAgent
     // ─────────────────────────────────────────────
     static class DiffHelper
     {
+        // Returns a compact diff string for embedding in the PR body
+        public static string GetSummary(string original, string fixed_)
+        {
+            string[] origLines = original.Replace("\r\n", "\n").Split('\n');
+            string[] fixLines  = fixed_.Replace("\r\n",  "\n").Split('\n');
+            var sb = new StringBuilder();
+            int maxLen = Math.Max(origLines.Length, fixLines.Length);
+            for (int i = 0; i < maxLen; i++)
+            {
+                string orig = i < origLines.Length ? origLines[i] : null;
+                string fix  = i < fixLines.Length  ? fixLines[i]  : null;
+                if (orig == fix) continue;
+                if (orig != null) sb.AppendLine("- " + orig.Trim());
+                if (fix  != null) sb.AppendLine("+ " + fix.Trim());
+            }
+            return sb.ToString().TrimEnd();
+        }
+
         public static bool Show(string original, string fixed_, string fileName)
         {
             string[] origLines = original.Replace("\r\n", "\n").Split('\n');
