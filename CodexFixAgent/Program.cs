@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Net.Mail;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -141,13 +142,17 @@ namespace CodexFixAgent
             Console.WriteLine("[Agent] File       : " + filePath);
             Console.WriteLine("[Agent] Calling Azure OpenAI...\n");
 
-            string fixedCode = AzureOpenAIClient.GetFix(fileName, originalCode, error);
-            if (fixedCode == null)
+            string rawFix    = AzureOpenAIClient.GetFix(fileName, originalCode, error);
+            if (rawFix == null)
             {
                 GitHelper.Run("checkout main");
                 GitHelper.Run("branch -D " + branchName);
                 return;
             }
+
+            // Apply smart merge — only accept changes near the error line
+            int    errorLine = AzureOpenAIClient.ParseErrorLine(error);
+            string fixedCode = AzureOpenAIClient.SmartMerge(originalCode, rawFix, errorLine);
 
             // ── 4. Show diff ───────────────────────────
             bool hasChanges = DiffHelper.Show(originalCode, fixedCode, fileName);
@@ -221,6 +226,15 @@ namespace CodexFixAgent
                         "**Error:**\n```\n" + error + "\n```");
 
                     Program.PrintSuccess("[Agent] PR created : " + prUrl);
+
+                    // Send email notification
+                    EmailNotifier.Send(
+                        subject : "PR Created: Fix for " + GitHelper.ErrorSummary(error),
+                        body    : "A bug fix PR has been created automatically by Codex Fix Agent.\n\n" +
+                                  "File    : " + fileName + "\n" +
+                                  "Branch  : " + branchName + "\n" +
+                                  "PR Link : " + prUrl + "\n\n" +
+                                  "Error:\n" + error);
                 }
                 catch (Exception ex)
                 {
@@ -352,7 +366,7 @@ namespace CodexFixAgent
             var req = (HttpWebRequest)WebRequest.Create(url);
             req.Method      = "POST";
             req.ContentType = "application/json";
-            req.Headers.Add("Authorization", "token " + token);
+            req.Headers.Add("Authorization", "Bearer " + token);
             req.UserAgent   = "CodexFixAgent/1.0";
             req.Timeout     = 30000;
 
@@ -385,14 +399,22 @@ namespace CodexFixAgent
     {
         public static string GetFix(string fileName, string code, string error)
         {
+            int errorLine = ParseErrorLine(error);
+
             string system =
                 "You are a code repair agent. " +
-                "Return ONLY the complete fixed code file. " +
+                "Fix ONLY the specific bug causing the error. " +
+                "Do NOT reformat, reorder, or change any other lines. " +
+                "Return the COMPLETE file with ONLY the minimum change needed. " +
                 "No explanations. No markdown. No code fences. Raw code only.";
 
-            string user = string.Format(
-                "File: {0}\n\nError/Exception:\n{1}\n\nOriginal Code:\n{2}",
-                fileName, error, code);
+            string user = errorLine > 0
+                ? string.Format(
+                    "File: {0}\nError on line {1}:\n{2}\n\nFix ONLY line {1}. Return the full file unchanged except that line.\n\nCode:\n{3}",
+                    fileName, errorLine, error, code)
+                : string.Format(
+                    "File: {0}\n\nError:\n{1}\n\nCode:\n{2}",
+                    fileName, error, code);
 
             string body = BuildRequestJson(ApiKeyStore.Deployment, system, user);
 
@@ -439,6 +461,67 @@ namespace CodexFixAgent
                 deployment, EscapeJson(system), EscapeJson(user));
         }
 
+        // Parse "line 268" or ":268" from error message
+        public static int ParseErrorLine(string error)
+        {
+            var m = Regex.Match(error, @"(?:line\s+|:)(\d+)", RegexOptions.IgnoreCase);
+            return m.Success ? int.Parse(m.Groups[1].Value) : 0;
+        }
+
+        // Only accept LLM changes within ±window lines of the error line
+        // Everything else is restored from the original
+        public static string SmartMerge(string original, string fixed_, int errorLine, int window = 20)
+        {
+            if (errorLine <= 0) return fixed_;
+
+            string[] origLines = original.Replace("\r\n", "\n").Split('\n');
+            string[] fixLines  = fixed_.Replace("\r\n",  "\n").Split('\n');
+
+            // If line counts differ, only keep the changed region
+            if (origLines.Length != fixLines.Length)
+            {
+                Console.WriteLine(string.Format(
+                    "[Agent] Smart merge: line count changed ({0} → {1}), applying targeted patch.",
+                    origLines.Length, fixLines.Length));
+                // Rebuild: keep orig lines outside window, use fix lines inside window
+                int start  = Math.Max(0, errorLine - window - 1);
+                int end    = Math.Min(origLines.Length - 1, errorLine + window - 1);
+                var result = new System.Collections.Generic.List<string>();
+                for (int i = 0; i < start; i++)
+                    result.Add(origLines[i]);
+                for (int i = 0; i < fixLines.Length; i++)
+                    result.Add(fixLines[i]);
+                for (int i = end + 1; i < origLines.Length; i++)
+                    result.Add(origLines[i]);
+                return string.Join("\n", result);
+            }
+
+            // Same line count — cherry-pick only changes near error line
+            string[] merged = new string[origLines.Length];
+            int accepted = 0, rejected = 0;
+            for (int i = 0; i < origLines.Length; i++)
+            {
+                int lineNum   = i + 1;
+                bool nearError = Math.Abs(lineNum - errorLine) <= window;
+                if (origLines[i] != fixLines[i] && !nearError)
+                {
+                    merged[i] = origLines[i]; // restore original
+                    rejected++;
+                }
+                else
+                {
+                    merged[i] = fixLines[i];
+                    if (origLines[i] != fixLines[i]) accepted++;
+                }
+            }
+
+            Console.WriteLine(string.Format(
+                "[Agent] Smart merge: {0} line(s) fixed near line {1}, {2} unrelated change(s) ignored.",
+                accepted, errorLine, rejected));
+
+            return string.Join("\n", merged);
+        }
+
         private static string EscapeJson(string s)
         {
             return s.Replace("\\", "\\\\").Replace("\"", "\\\"")
@@ -468,6 +551,11 @@ namespace CodexFixAgent
         public static string Key          { get; private set; }
         public static string Deployment   { get; private set; }
         public static string GithubToken  { get; private set; }
+        public static string SmtpHost     { get; private set; }
+        public static int    SmtpPort     { get; private set; }
+        public static string SmtpUser     { get; private set; }
+        public static string SmtpPass     { get; private set; }
+        public static string NotifyEmail  { get; private set; }
 
         public static bool Load()
         {
@@ -521,6 +609,61 @@ namespace CodexFixAgent
                 if (k == "AZURE_OPENAI_KEY")      Key         = v;
                 if (k == "AZURE_DEPLOYMENT")      Deployment  = v;
                 if (k == "GITHUB_TOKEN")          GithubToken = v;
+                if (k == "SMTP_HOST")             SmtpHost    = v;
+                if (k == "SMTP_PORT")             SmtpPort    = int.TryParse(v, out int p) ? p : 587;
+                if (k == "SMTP_USER")             SmtpUser    = v;
+                if (k == "SMTP_PASS")             SmtpPass    = v;
+                if (k == "NOTIFY_EMAIL")          NotifyEmail = v;
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    //  EMAIL NOTIFIER
+    //  Uses System.Net.Mail — no NuGet needed
+    // ─────────────────────────────────────────────
+    static class EmailNotifier
+    {
+        public static void Send(string subject, string body)
+        {
+            string host    = ApiKeyStore.SmtpHost;
+            string user    = ApiKeyStore.SmtpUser;
+            string pass    = ApiKeyStore.SmtpPass;
+            string to      = ApiKeyStore.NotifyEmail;
+            int    port    = ApiKeyStore.SmtpPort;
+
+            if (string.IsNullOrEmpty(host) || string.IsNullOrEmpty(user) ||
+                string.IsNullOrEmpty(pass) || string.IsNullOrEmpty(to))
+            {
+                Console.WriteLine("[Email] SMTP not configured in keys.config — skipping email.");
+                return;
+            }
+
+            try
+            {
+                var msg = new MailMessage
+                {
+                    From       = new MailAddress(user, "Codex Fix Agent"),
+                    Subject    = subject,
+                    Body       = body,
+                    IsBodyHtml = false
+                };
+                msg.To.Add(to);
+
+                var smtp = new SmtpClient(host, port)
+                {
+                    EnableSsl             = true,
+                    Credentials           = new System.Net.NetworkCredential(user, pass),
+                    DeliveryMethod        = SmtpDeliveryMethod.Network,
+                    Timeout               = 30000
+                };
+
+                smtp.Send(msg);
+                Program.PrintSuccess("[Email] Notification sent to: " + to);
+            }
+            catch (Exception ex)
+            {
+                Program.PrintError("Email failed: " + ex.Message);
             }
         }
     }
