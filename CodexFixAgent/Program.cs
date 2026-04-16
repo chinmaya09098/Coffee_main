@@ -49,7 +49,7 @@ namespace CodexFixAgent
             if (!File.Exists(filePath))
             {
                 PrintError("File not found: " + filePath);
-                Pause(); return;
+                Exit(1); return;
             }
 
             if (string.IsNullOrEmpty(errorMsg))
@@ -63,7 +63,6 @@ namespace CodexFixAgent
             }
 
             new FixAgent().Run(filePath, errorMsg, autoApply);
-            Pause();
         }
 
         public static void PrintError(string msg)
@@ -87,10 +86,9 @@ namespace CodexFixAgent
             Console.ResetColor();
         }
 
-        static void Pause()
+        public static void Exit(int code = 0)
         {
-            try { Console.WriteLine("\nPress any key to exit..."); Console.ReadKey(); }
-            catch { }
+            Environment.Exit(code);
         }
     }
 
@@ -235,11 +233,15 @@ namespace CodexFixAgent
                                   "Branch  : " + branchName + "\n" +
                                   "PR Link : " + prUrl + "\n\n" +
                                   "Error:\n" + error);
+
+                    Console.WriteLine("\n[Agent] Done. Exiting.");
+                    Program.Exit(0);
                 }
                 catch (Exception ex)
                 {
                     Program.PrintError("PR creation failed: " + ex.Message);
                     Console.WriteLine("[Agent] Push succeeded — create PR manually on GitHub.");
+                    Program.Exit(1);
                 }
             }
         }
