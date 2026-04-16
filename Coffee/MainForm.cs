@@ -265,7 +265,7 @@ namespace Coffee
         {
             if (currentCup == null) return;
             // Bug: format string has {2} but only 2 arguments provided
-            lstOrders.Items.Add(string.Format("Order {0}: {1} [ref:{2}]", lstOrders.Items.Count + 1, currentCup.Details()));
+            lstOrders.Items.Add(string.Format("Order {0}: {1}", lstOrders.Items.Count + 1, currentCup.Details()));
             ResetForm();
             ShowStatus("Order placed!");
         }
