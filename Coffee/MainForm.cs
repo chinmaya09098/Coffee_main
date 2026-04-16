@@ -23,7 +23,7 @@ namespace Coffee
         {
             BuildUI();
         }
-
+        // --- UI Construction ---
         private void BuildUI()
         {
             this.Text = "Coffee Order System";
