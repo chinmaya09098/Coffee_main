@@ -22,13 +22,9 @@ A Windows Forms coffee ordering application paired with an AI-powered automated 
 - [Usage](#usage)
   - [Coffee Application](#coffee-application)
   - [CodexFixAgent CLI](#codexfixagent-cli)
-- [Git Commands Reference](#git-commands-reference)
-  - [General Repository Commands](#general-repository-commands)
-  - [Commands Used Internally by CodexFixAgent](#commands-used-internally-by-codexfixagent)
-  - [Branch Management Commands](#branch-management-commands)
-- [Project Structure](#project-structure)
 - [Branch Naming Convention](#branch-naming-convention)
-- [Contributing](#contributing)
+- [Project Structure](#project-structure)
+
 
 ---
 
