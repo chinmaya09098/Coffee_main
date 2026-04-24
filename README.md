@@ -18,7 +18,6 @@ A Windows Forms coffee ordering application paired with an AI-powered automated 
   - [Run Tests](#run-tests)
 - [Configuration](#configuration)
   - [keys.config](#keysconfig)
-  - [Environment Variables](#environment-variables)
 - [Usage](#usage)
   - [Coffee Application](#coffee-application)
   - [CodexFixAgent CLI](#codexfixagent-cli)
