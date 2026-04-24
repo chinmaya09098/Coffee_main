@@ -278,101 +278,23 @@ Examples:
 [12] GitHub PR opened via REST API — URL printed to console
 [13] Email notification sent to NOTIFY_EMAIL
 ```
-
 ---
 
-## Git Commands Reference
+## Branch Naming Convention
 
-### General Repository Commands
+CodexFixAgent automatically names fix branches using the pattern:
 
-```bash
-# Clone the repository
-git clone https://github.com/chinmaya09098/Coffee_main.git
-
-# Check current status
-git status
-
-# View commit history
-git log --oneline
-
-# View all branches (local + remote)
-git branch -a
-
-# Switch to main branch
-git checkout main
-
-# Pull latest changes from remote
-git pull origin main
-
-# Fetch all remote branches without merging
-git fetch --all
-
-# View the remote URL
-git remote get-url origin
-
-# Set a new remote URL
-git remote set-url origin https://github.com/<owner>/<repo>.git
+```
+fix/<sanitised-error-summary>-<yyyyMMdd-HHmm>
 ```
 
-### Commands Used Internally by CodexFixAgent
+Example:
 
-These git commands are executed automatically by the agent during the fix pipeline:
-
-```bash
-# Switch to main and get latest code
-git checkout main
-git pull origin main
-
-# Create a new fix branch (timestamp format: yyyyMMdd-HHmm)
-git checkout -b fix/<error-slug>-<yyyyMMdd-HHmm>
-
-# Stage the fixed file
-git add <relative-path-to-file>
-
-# Commit with auto-generated message
-git commit -m "Fix: <first-60-chars-of-error>"
-
-# Push fix branch and set upstream tracking
-git push -u origin fix/<error-slug>-<yyyyMMdd-HHmm>
-
-# Get GitHub remote URL (used to extract owner/repo for PR creation)
-git remote get-url origin
-
-# Abort: return to main and delete the fix branch (if user cancels)
-git checkout main
-git branch -D fix/<error-slug>-<yyyyMMdd-HHmm>
+```
+fix/system-formatexception-index-zero-based-must-20260416-1405
 ```
 
-### Branch Management Commands
-
-```bash
-# List all local branches
-git branch
-
-# List all remote branches
-git branch -r
-
-# Create a new branch and switch to it
-git checkout -b feature/my-feature
-
-# Delete a local branch (safe — only if merged)
-git branch -d fix/my-branch
-
-# Force-delete a local branch
-git branch -D fix/my-branch
-
-# Delete a remote branch
-git push origin --delete fix/my-branch
-
-# Rename current branch
-git branch -m new-branch-name
-
-# Push a branch and set remote tracking
-git push -u origin feature/my-feature
-
-# Sync local branch list with remote (prune deleted remotes)
-git fetch --prune
-```
+The error summary is sanitised to lowercase, spaces replaced with hyphens, and special characters removed.
 
 ---
 
@@ -403,53 +325,4 @@ Coffee-main/
 
 ---
 
-## Branch Naming Convention
 
-CodexFixAgent automatically names fix branches using the pattern:
-
-```
-fix/<sanitised-error-summary>-<yyyyMMdd-HHmm>
-```
-
-Example:
-
-```
-fix/system-formatexception-index-zero-based-must-20260416-1405
-```
-
-The error summary is sanitised to lowercase, spaces replaced with hyphens, and special characters removed.
-
----
-
-## Contributing
-
-1. Fork the repository on GitHub
-2. Clone your fork:
-   ```bash
-   git clone https://github.com/<your-username>/Coffee_main.git
-   cd Coffee_main
-   ```
-3. Create a feature branch:
-   ```bash
-   git checkout -b feature/my-change
-   ```
-4. Make your changes, then stage and commit:
-   ```bash
-   git add <changed-files>
-   git commit -m "Add: brief description of change"
-   ```
-5. Push to your fork:
-   ```bash
-   git push origin feature/my-change
-   ```
-6. Open a pull request against `main` on GitHub
-
-**Before opening a PR — verify all tests pass:**
-
-```bash
-# Build the full solution
-msbuild Coffee.slnx /t:Clean,Build /p:Configuration=Debug
-
-# Run the test suite
-"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe" Coffee.Tests\bin\Debug\Coffee.Tests.dll
-```
