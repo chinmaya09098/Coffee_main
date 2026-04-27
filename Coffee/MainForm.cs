@@ -23,7 +23,7 @@ namespace Coffee
         {
             BuildUI();
         }
-        // --- UI Construction ---
+        
         private void BuildUI()
         {
             this.Text = "Coffee Order System";
@@ -33,7 +33,7 @@ namespace Coffee
             this.MaximizeBox = false;
             this.BackColor = Color.FromArgb(245, 235, 220);
 
-            // --- Title ---
+            
             var lblTitle = new Label
             {
                 Text = "Coffee Order System",
@@ -44,7 +44,7 @@ namespace Coffee
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            // --- Bean Type ---
+            
             var lblBeans = new Label
             {
                 Text = "Bean Type:",
@@ -62,7 +62,7 @@ namespace Coffee
                 Size = new Size(280, 25)
             };
 
-            // --- Milk ---
+            
             var lblMilk = new Label
             {
                 Text = "Milk:",
@@ -82,7 +82,7 @@ namespace Coffee
                 Size = new Size(150, 25)
             };
 
-            // --- Sugar ---
+            
             var lblSugar = new Label
             {
                 Text = "Sugar (0-5):",
@@ -111,7 +111,7 @@ namespace Coffee
             btnAddSugar.Click += BtnAddSugar_Click;
             btnAddSugar.Enabled = false;
 
-            // --- Divider ---
+            
             var divider = new Panel
             {
                 Location = new Point(25, 185),
@@ -119,7 +119,7 @@ namespace Coffee
                 BackColor = Color.FromArgb(180, 140, 100)
             };
 
-            // --- Current Cup ---
+            
             var lblCupTitle = new Label
             {
                 Text = "Current Cup:",
@@ -151,7 +151,7 @@ namespace Coffee
                 Size = new Size(395, 18)
             };
 
-            // --- Order Buttons ---
+            
             btnConfirmOrder = MakeButton("Confirm Order", new Point(25, 280), new Size(140, 35),
                 Color.FromArgb(80, 40, 10));
             btnConfirmOrder.Font = new Font("Segoe UI", 10, FontStyle.Bold);
@@ -170,7 +170,7 @@ namespace Coffee
                 ResetForm();
             };
 
-            // --- Orders List ---
+            
             var lblOrders = new Label
             {
                 Text = "Orders Placed:",
@@ -190,7 +190,7 @@ namespace Coffee
                 ForeColor = Color.FromArgb(60, 30, 10)
             };
 
-            // --- Done ---
+            
             var btnDone = MakeButton("Done", new Point(320, 490), new Size(100, 32),
                 Color.FromArgb(80, 80, 80));
             btnDone.Click += (s, e) => this.Close();
@@ -264,8 +264,8 @@ namespace Coffee
         private void BtnConfirmOrder_Click(object sender, EventArgs e)
         {
             if (currentCup == null) return;
-            // Bug: format string has {2} but only 2 arguments provided
-            lstOrders.Items.Add(string.Format("Order {0}: {1} [ref:{2}]", lstOrders.Items.Count + 1, currentCup.Details()));
+            
+            lstOrders.Items.Add(string.Format("Order {0}: {1}", lstOrders.Items.Count + 1, currentCup.Details()));
             ResetForm();
             ShowStatus("Order placed!");
         }
