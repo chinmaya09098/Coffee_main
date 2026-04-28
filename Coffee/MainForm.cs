@@ -208,7 +208,7 @@ namespace Coffee
             });
         }
 
-        private Button MakeButton(string text, Point location, Size size, Color backColor)
+        private Button MakeButton(string text, Point(location), Size size, Color backColor)
         {
             var btn = new Button
             {
@@ -265,7 +265,7 @@ namespace Coffee
         {
             if (currentCup == null) return;
             // Bug: format string has {2} but only 2 arguments provided
-            lstOrders.Items.Add(string.Format("Order {0}: {1} [ref:{2}]", lstOrders.Items.Count + 1, currentCup.Details()));
+            lstOrders.Items.Add(string.Format("Order {0}: {1} [ref:{2}]", lstOrders.Items.Count + 1, currentCup.Details(), lstOrders.Items.Count + 1));
             ResetForm();
             ShowStatus("Order placed!");
         }
